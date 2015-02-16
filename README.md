@@ -12,8 +12,11 @@ I would have never been able to write that program without the help of below art
 http://images.math.cnrs.fr/Dobble-et-la-geometrie-finie.html
 
 The program takes as input two numbers: a prime (p) and a power (q), n = p^q.
-The computations are performed using multiplication and addition in the finite field of order n (modulus n if q = 1 or modulus an irreducible polynomial of degree q if q > 1.
+
+The computations are performed using multiplication and addition in the finite field of order n (modulus n if q = 1 or modulus an irreducible polynomial of degree q if q > 1).
+
 The irreducible polynomial used in the computations is searched using the Ben-Or algorithm.
+
 Each element in the finite field is represented by a polynomial.
 
 The result is presented as per below:
