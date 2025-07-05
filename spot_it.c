@@ -1,11 +1,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#define FREE(p) free(p), p = NULL
+#include <limits.h>
 
 #define PRIME_MIN 2
-#define ORDER_MAX 4096
 #define POWER_MIN 1
 
 typedef struct {
@@ -17,33 +15,32 @@ polynomial_t;
 unsigned long prime_g, order_g, *values_g = NULL, order_square_g, *mul_cache_g = NULL, *add_cache_g = NULL;
 polynomial_t *pn_irreducible_g = NULL, **pn_ff_g = NULL;
 
-int is_prime(void);
-int search_irreducible_pn(unsigned long);
-int pn_is_irreducible(void);
-polynomial_t *pn_gcd(const polynomial_t *, const polynomial_t *);
-int ff_values(unsigned long, unsigned long);
-unsigned long *cache_creation(void);
-unsigned long operation(unsigned long, unsigned long, unsigned long *, polynomial_t *(*)(const polynomial_t *, const polynomial_t *));
-polynomial_t *pn_modulus(const polynomial_t *, const polynomial_t *);
-polynomial_t *pn_subtraction(const polynomial_t *, const polynomial_t *);
-polynomial_t *pn_multiplication(const polynomial_t *, const polynomial_t *);
-polynomial_t *pn_addition(const polynomial_t *, const polynomial_t *);
-void pn_min_max(const polynomial_t *, const polynomial_t *, const polynomial_t **, const polynomial_t **);
-unsigned long pff_opposite(unsigned long);
-unsigned long pff_inverse(unsigned long);
-unsigned long ff_value(const unsigned long *, unsigned long);
-void cleanup(void);
-polynomial_t *pn_creation(unsigned long);
-polynomial_t *pn_copy(const polynomial_t *);
-int pn_reduction(polynomial_t *);
-void pn_destruction(polynomial_t *);
-void log_message(const char *, ...);
+static int is_prime(void);
+static int search_irreducible_pn(unsigned long);
+static int pn_is_irreducible(void);
+static polynomial_t *pn_gcd(const polynomial_t *, const polynomial_t *);
+static int ff_values(unsigned long, unsigned long);
+static unsigned long *cache_creation(void);
+static unsigned long operation(unsigned long, unsigned long, unsigned long *, polynomial_t *(*)(const polynomial_t *, const polynomial_t *));
+static polynomial_t *pn_modulus(const polynomial_t *, const polynomial_t *);
+static polynomial_t *pn_subtraction(const polynomial_t *, const polynomial_t *);
+static polynomial_t *pn_multiplication(const polynomial_t *, const polynomial_t *);
+static polynomial_t *pn_addition(const polynomial_t *, const polynomial_t *);
+static void pn_min_max(const polynomial_t *, const polynomial_t *, const polynomial_t **, const polynomial_t **);
+static unsigned long pff_opposite(unsigned long);
+static unsigned long pff_inverse(unsigned long);
+static unsigned long ff_value(const unsigned long *, unsigned long);
+static void cleanup(void);
+static polynomial_t *pn_creation(unsigned long);
+static polynomial_t *pn_copy(const polynomial_t *);
+static int pn_reduction(polynomial_t *);
+static void pn_destruction(polynomial_t *);
+static void log_message(const char *, ...);
 
 int main(void) {
-int result;
-unsigned long power, i, j, k, l;
-	if (scanf("%lu", &prime_g) != 1 || prime_g < PRIME_MIN || prime_g > ORDER_MAX) {
-		log_message("Prime is not between %lu and %lu\n", PRIME_MIN, ORDER_MAX);
+	unsigned long power, i;
+	if (scanf("%lu", &prime_g) != 1 || prime_g < PRIME_MIN) {
+		log_message("Prime is not greater than or equal to %lu\n", PRIME_MIN);
 		return EXIT_FAILURE;
 	}
 	if (!is_prime()) {
@@ -55,11 +52,11 @@ unsigned long power, i, j, k, l;
 		return EXIT_FAILURE;
 	}
 	order_g = prime_g;
-	for (i = 1; i < power && order_g <= ORDER_MAX; i++) {
+	for (i = 1; i < power && order_g <= ULONG_MAX/prime_g; ++i) {
 		order_g *= prime_g;
 	}
-	if (order_g > ORDER_MAX) {
-		log_message("Order is not lesser than or equal to %lu\n", ORDER_MAX);
+	if (order_g > ULONG_MAX/prime_g) {
+		log_message("Order is not lesser than or equal to %lu\n", ULONG_MAX);
 		return EXIT_FAILURE;
 	}
 	pn_irreducible_g = pn_creation(power);
@@ -68,18 +65,25 @@ unsigned long power, i, j, k, l;
 		return EXIT_FAILURE;
 	}
 	if (power > 1) {
-		result = search_irreducible_pn(0);
+		int result = search_irreducible_pn(0);
 		if (result < 1) {
-			log_message(!result ? "Irreducible polynomial not found\n":"main error: result = search_irreducible_pn(0)\n");
+			if (!result) {
+				log_message("Irreducible polynomial not found\n");
+			}
 			cleanup();
 			return EXIT_FAILURE;
 		}
 	}
 	else {
-		for (i = 0; i < power; i++) {
+		for (i = 0; i < power; ++i) {
 			pn_irreducible_g->values[i] = 0;
 		}
 		pn_irreducible_g->values[power] = 1;
+	}
+	if (sizeof(polynomial_t *) > ULONG_MAX/order_g) {
+		log_message("Will not be able to allocate memory for pn_ff_g\n");
+		cleanup();
+		return EXIT_FAILURE;
 	}
 	pn_ff_g = malloc(sizeof(polynomial_t *)*order_g);
 	if (!pn_ff_g) {
@@ -87,10 +91,10 @@ unsigned long power, i, j, k, l;
 		cleanup();
 		return EXIT_FAILURE;
 	}
-	for (i = 0; i < order_g; i++) {
+	for (i = 0; i < order_g; ++i) {
 		pn_ff_g[i] = NULL;
 	}
-	for (i = 0; i < power; i++) {
+	for (i = 0; i < power; ++i) {
 		values_g = malloc(sizeof(unsigned long)*(i+1));
 		if (!values_g) {
 			log_message("main error: values_g = malloc(%lu)\n", sizeof(unsigned long *)*(i+1));
@@ -99,11 +103,16 @@ unsigned long power, i, j, k, l;
 		}
 		if (!ff_values(i, 0)) {
 			log_message("main error: ff_values(%lu, 0)\n", i);
-			FREE(values_g);
+			free(values_g);
 			cleanup();
 			return EXIT_FAILURE;
 		}
-		FREE(values_g);
+		free(values_g);
+	}
+	if (order_g*sizeof(unsigned long) > ULONG_MAX/order_g) {
+		log_message("Will not be able to allocate memory for cache\n");
+		cleanup();
+		return EXIT_FAILURE;
 	}
 	order_square_g = order_g*order_g;
 	mul_cache_g = cache_creation();
@@ -118,10 +127,12 @@ unsigned long power, i, j, k, l;
 		cleanup();
 		return EXIT_FAILURE;
 	}
-	for (i = 0; i < order_g; i++) {
-		for (j = 0; j < order_g; j++) {
-			for (k = 0; k < order_g; k++) {
-				l = operation(i, k, mul_cache_g, pn_multiplication);
+	for (i = 0; i < order_g; ++i) {
+		unsigned long j;
+		for (j = 0; j < order_g; ++j) {
+			unsigned long k;
+			for (k = 0; k < order_g; ++k) {
+				unsigned long l = operation(i, k, mul_cache_g, pn_multiplication);
 				if (l == order_g) {
 					log_message("main error: l = operation(%lu, %lu, mul_cache_g, pn_multiplication)\n", i, k);
 					cleanup();
@@ -133,55 +144,54 @@ unsigned long power, i, j, k, l;
 					cleanup();
 					return EXIT_FAILURE;
 				}
-				if (k) {
-					printf(" ");
-				}
-				printf("%lu", l*order_g+k);
+				printf("%lu ", l*order_g+k);
 			}
-			printf(" %lu\n", order_square_g+i);
+			printf("%lu\n", order_square_g+i);
 		}
 	}
-	for (i = 0; i < order_g; i++) {
-		printf("%lu", i);
-		for (j = 1; j < order_g; j++) {
-			printf(" %lu", j*order_g+i);
+	for (i = 0; i < order_g; ++i) {
+		unsigned long j;
+		for (j = 0; j < order_g; ++j) {
+			printf("%lu ", j*order_g+i);
 		}
-		printf(" %lu\n", order_square_g+order_g);
+		printf("%lu\n", order_square_g+order_g);
 	}
-	printf("%lu", order_square_g);
-	for (i = 1; i <= order_g; i++) {
-		printf(" %lu", order_square_g+i);
+	for (i = 0; i < order_g; ++i) {
+		printf("%lu ", order_square_g+i);
 	}
-	puts("");
+	printf("%lu\n", order_square_g+order_g);
+	fflush(stdout);
 	cleanup();
 	return EXIT_SUCCESS;
 }
 
-int is_prime(void) {
-unsigned long i;
-	if (prime_g > 2 && prime_g%2 == 0) {
+static int is_prime(void) {
+	unsigned long i;
+	if (prime_g < 4) {
+		return 1;
+	}
+	if (prime_g%2 == 0 || prime_g%3 == 0) {
 		return 0;
 	}
-	for (i = 3; i*i <= prime_g; i += 2) {
-		if (prime_g%i == 0) {
+	for (i = 5; i*i <= prime_g; i += 6) {
+		if (prime_g%i == 0 || prime_g%(i+2) == 0) {
 			return 0;
 		}
 	}
 	return 1;
 }
 
-int search_irreducible_pn(unsigned long degree) {
-int result = 0;
-unsigned long i;
+static int search_irreducible_pn(unsigned long degree) {
+	int result;
 	if (degree < pn_irreducible_g->degree) {
-		i = degree == 0;
-		while (i < prime_g && !result) {
+		unsigned long i;
+		result = 0;
+		for (i = degree == 0; i < prime_g && !result; ++i) {
 			pn_irreducible_g->values[degree] = i;
 			result = search_irreducible_pn(degree+1);
 			if (result < 0) {
 				log_message("search_irreducible_pn error: result = search_irreducible_pn(%lu)\n", degree+1);
 			}
-			i++;
 		}
 	}
 	else {
@@ -194,20 +204,18 @@ unsigned long i;
 	return result;
 }
 
-int pn_is_irreducible(void) {
-unsigned long power, degree, i, j;
-polynomial_t *pn_result = NULL, *pn_tmp = NULL;
-	power = prime_g;
-	degree = pn_irreducible_g->degree >> 1;
-	for (i = 0; i < degree; i++) {
-		pn_result = pn_creation(power);
+static int pn_is_irreducible(void) {
+	unsigned long power = prime_g, degree = pn_irreducible_g->degree >> 1, i;
+	for (i = 0; i < degree; ++i) {
+		unsigned long j;
+		polynomial_t *pn_result = pn_creation(power), *pn_tmp;
 		if (!pn_result) {
 			log_message("pn_is_irreducible error: pn_result = pn_creation(%lu)\n", power);
 			return -1;
 		}
 		pn_result->values[0] = 0;
 		pn_result->values[1] = pff_opposite(1);
-		for (j = 2; j < pn_result->degree; j++) {
+		for (j = 2; j < pn_result->degree; ++j) {
 			pn_result->values[j] = 0;
 		}
 		pn_result->values[pn_result->degree] = 1;
@@ -235,10 +243,10 @@ polynomial_t *pn_result = NULL, *pn_tmp = NULL;
 	return 1;
 }
 
-polynomial_t *pn_gcd(const polynomial_t *pn_a, const polynomial_t *pn_b) {
-polynomial_t *pn_result = NULL, *pn_tmp = NULL;
+static polynomial_t *pn_gcd(const polynomial_t *pn_a, const polynomial_t *pn_b) {
+	polynomial_t *pn_result;
 	if (pn_b->degree || pn_b->values[0]) {
-		pn_tmp = pn_modulus(pn_a, pn_b);
+		polynomial_t *pn_tmp = pn_modulus(pn_a, pn_b);
 		if (!pn_tmp) {
 			log_message("pn_gcd error: pn_tmp = pn_modulus(pn_a, pn_b)\n");
 			return NULL;
@@ -255,54 +263,49 @@ polynomial_t *pn_result = NULL, *pn_tmp = NULL;
 	return pn_result;
 }
 
-int ff_values(unsigned long degree_max, unsigned long degree) {
-int result = 1;
-unsigned long i, value, j;
+static int ff_values(unsigned long degree_max, unsigned long degree) {
+	unsigned long i;
 	if (degree < degree_max) {
-		for (i = 0; i < prime_g && result; i++) {
+		for (i = 0; i < prime_g; ++i) {
 			values_g[degree] = i;
-			result = ff_values(degree_max, degree+1);
-			if (!result) {
+			if (!ff_values(degree_max, degree+1)) {
 				log_message("ff_values error: result = ff_values(%lu, %lu)\n", degree_max, degree+1);
+				return 0;
 			}
 		}
+		return 1;
 	}
-	else {
-		i = degree > 0;
-		while (i < prime_g && result) {
-			values_g[degree] = i;
-			value = ff_value(values_g, degree);
-			pn_ff_g[value] = pn_creation(degree_max);
-			if (pn_ff_g[value]) {
-				for (j = 0; j <= degree_max; j++) {
-					pn_ff_g[value]->values[j] = values_g[j];
-				}
-			}
-			else {
-				log_message("ff_values error: pn_ff_g[%lu] = pn_creation(%lu)\n", value, degree_max);
-				result = 0;
-			}
-			i++;
+	for (i = degree > 0; i < prime_g; ++i) {
+		unsigned long value, j;
+		values_g[degree] = i;
+		value = ff_value(values_g, degree);
+		pn_ff_g[value] = pn_creation(degree_max);
+		if (!pn_ff_g[value]) {
+			log_message("ff_values error: pn_ff_g[%lu] = pn_creation(%lu)\n", value, degree_max);
+			return 0;
+		}
+		for (j = 0; j <= degree_max; ++j) {
+			pn_ff_g[value]->values[j] = values_g[j];
 		}
 	}
-	return result;
+	return 1;
 }
 
-unsigned long *cache_creation(void) {
-unsigned long *cache = malloc(sizeof(unsigned long)*order_square_g), i;
+static unsigned long *cache_creation(void) {
+	unsigned long *cache = malloc(sizeof(unsigned long)*order_square_g), i;
 	if (!cache) {
 		log_message("cache_creation error: cache = malloc(%lu)\n", sizeof(unsigned long)*order_square_g);
 		return NULL;
 	}
-	for (i = 0; i < order_square_g; i++) {
+	for (i = 0; i < order_square_g; ++i) {
 		cache[i] = order_g;
 	}
 	return cache;
 }
 
-unsigned long operation(unsigned long i, unsigned long j, unsigned long *cache, polynomial_t *(*pn_operation)(const polynomial_t *, const polynomial_t *)) {
-unsigned long icache = i*order_g+j, result;
-polynomial_t *pn_result = NULL, *pn_tmp = NULL;
+static unsigned long operation(unsigned long i, unsigned long j, unsigned long *cache, polynomial_t *(*pn_operation)(const polynomial_t *, const polynomial_t *)) {
+	unsigned long icache = i*order_g+j, result;
+	polynomial_t *pn_result, *pn_tmp;
 	if (cache[icache] < order_g) {
 		return cache[icache];
 	}
@@ -325,9 +328,8 @@ polynomial_t *pn_result = NULL, *pn_tmp = NULL;
 	return result;
 }
 
-polynomial_t *pn_modulus(const polynomial_t *pn_a, const polynomial_t *pn_b) {
-unsigned long i;
-polynomial_t *pn_result = NULL, *pn_high = NULL, *pn_tmp = NULL;
+static polynomial_t *pn_modulus(const polynomial_t *pn_a, const polynomial_t *pn_b) {
+	polynomial_t *pn_result;
 	if (!pn_b->degree && !pn_b->values[0]) {
 		log_message("pn_modulus error: division by 0\n");
 		return NULL;
@@ -338,17 +340,18 @@ polynomial_t *pn_result = NULL, *pn_high = NULL, *pn_tmp = NULL;
 		return NULL;
 	}
 	while ((pn_result->degree || pn_result->values[0]) && pn_result->degree >= pn_b->degree) {
-		pn_high = pn_creation(pn_result->degree-pn_b->degree);
+		unsigned long i;
+		polynomial_t *pn_high = pn_creation(pn_result->degree-pn_b->degree), *pn_tmp;
 		if (!pn_high) {
 			log_message("pn_modulus error: pn_high = pn_creation(%lu)\n", pn_result->degree-pn_b->degree);
 			pn_destruction(pn_result);
 			return NULL;
 		}
-		for (i = 0; i < pn_high->degree; i++) {
+		for (i = 0; i < pn_high->degree; ++i) {
 			pn_high->values[i] = 0;
 		}
 		pn_high->values[pn_high->degree] = pn_result->values[pn_result->degree]*pff_inverse(pn_b->values[pn_b->degree]);
-		if (pn_reduction(pn_high) == EXIT_FAILURE) {
+		if (!pn_reduction(pn_high)) {
 			log_message("pn_modulus error: pn_reduction(pn_high)\n");
 			pn_destruction(pn_result);
 			return NULL;
@@ -373,88 +376,83 @@ polynomial_t *pn_result = NULL, *pn_high = NULL, *pn_tmp = NULL;
 	return pn_result;
 }
 
-polynomial_t *pn_subtraction(const polynomial_t *pn_a, const polynomial_t *pn_b) {
-unsigned long i;
-const polynomial_t *pn_min = NULL, *pn_max = NULL;
-polynomial_t *pn_result = NULL;
+static polynomial_t *pn_subtraction(const polynomial_t *pn_a, const polynomial_t *pn_b) {
+	unsigned long i;
+	const polynomial_t *pn_min, *pn_max;
+	polynomial_t *pn_result;
 	pn_min_max(pn_a, pn_b, &pn_min, &pn_max);
 	pn_result = pn_creation(pn_max->degree);
 	if (!pn_result) {
 		log_message("pn_subtraction error: pn_result = pn_creation(%lu)\n", pn_max->degree);
 		return NULL;
 	}
-	for (i = 0; i <= pn_min->degree; i++) {
+	for (i = 0; i <= pn_min->degree; ++i) {
 		pn_result->values[i] = pn_a->values[i]+pff_opposite(pn_b->values[i]);
 	}
-	for (i = pn_min->degree+1; i <= pn_a->degree; i++) {
+	for (i = pn_min->degree+1; i <= pn_a->degree; ++i) {
 		pn_result->values[i] = pn_a->values[i];
 	}
-	for (i = pn_min->degree+1; i <= pn_b->degree; i++) {
+	for (i = pn_min->degree+1; i <= pn_b->degree; ++i) {
 		pn_result->values[i] = pff_opposite(pn_b->values[i]);
 	}
-	if (pn_reduction(pn_result) == EXIT_SUCCESS) {
+	if (pn_reduction(pn_result)) {
 		return pn_result;
 	}
-	else {
-		log_message("pn_subtraction error: pn_reduction(pn_result)\n");
-		return NULL;
-	}
+	log_message("pn_subtraction error: pn_reduction(pn_result)\n");
+	return NULL;
 }
 
-polynomial_t *pn_multiplication(const polynomial_t *pn_a, const polynomial_t *pn_b) {
-unsigned long i, j;
-polynomial_t *pn_result = pn_creation(pn_a->degree+pn_b->degree);
+static polynomial_t *pn_multiplication(const polynomial_t *pn_a, const polynomial_t *pn_b) {
+	unsigned long i;
+	polynomial_t *pn_result = pn_creation(pn_a->degree+pn_b->degree);
 	if (!pn_result) {
 		log_message("pn_multiplication error: pn_result = pn_creation(%lu)\n", pn_a->degree+pn_b->degree);
 		return NULL;
 	}
-	for (i = 0; i <= pn_result->degree; i++) {
+	for (i = 0; i <= pn_result->degree; ++i) {
 		pn_result->values[i] = 0;
 	}
-	for (i = 0; i <= pn_a->degree; i++) {
+	for (i = 0; i <= pn_a->degree; ++i) {
 		if (pn_a->values[i]) {
-			for (j = 0; j <= pn_b->degree; j++) {
+			unsigned long j;
+			for (j = 0; j <= pn_b->degree; ++j) {
 				if (pn_b->values[j]) {
 					pn_result->values[i+j] += pn_a->values[i]*pn_b->values[j];
 				}
 			}
 		}
 	}
-	if (pn_reduction(pn_result) == EXIT_SUCCESS) {
+	if (pn_reduction(pn_result)) {
 		return pn_result;
 	}
-	else {
-		log_message("pn_multiplication error: pn_reduction(pn_result)\n");
-		return NULL;
-	}
+	log_message("pn_multiplication error: pn_reduction(pn_result)\n");
+	return NULL;
 }
 
-polynomial_t *pn_addition(const polynomial_t *pn_a, const polynomial_t *pn_b) {
-unsigned long i;
-const polynomial_t *pn_min = NULL, *pn_max = NULL;
-polynomial_t *pn_result = NULL;
+static polynomial_t *pn_addition(const polynomial_t *pn_a, const polynomial_t *pn_b) {
+	unsigned long i;
+	const polynomial_t *pn_min, *pn_max;
+	polynomial_t *pn_result;
 	pn_min_max(pn_a, pn_b, &pn_min, &pn_max);
 	pn_result = pn_creation(pn_max->degree);
 	if (!pn_result) {
 		log_message("pn_addition error: pn_result = pn_creation(%lu)\n", pn_max->degree);
 		return NULL;
 	}
-	for (i = 0; i <= pn_min->degree; i++) {
+	for (i = 0; i <= pn_min->degree; ++i) {
 		pn_result->values[i] = pn_a->values[i]+pn_b->values[i];
 	}
-	for (i = pn_min->degree+1; i <= pn_max->degree; i++) {
+	for (i = pn_min->degree+1; i <= pn_max->degree; ++i) {
 		pn_result->values[i] = pn_max->values[i];
 	}
-	if (pn_reduction(pn_result) == EXIT_SUCCESS) {
+	if (pn_reduction(pn_result)) {
 		return pn_result;
 	}
-	else {
-		log_message("pn_addition error: pn_reduction(pn_result)\n");
-		return NULL;
-	}
+	log_message("pn_addition error: pn_reduction(pn_result)\n");
+	return NULL;
 }
 
-void pn_min_max(const polynomial_t *pn_a, const polynomial_t *pn_b, const polynomial_t **pn_min, const polynomial_t **pn_max) {
+static void pn_min_max(const polynomial_t *pn_a, const polynomial_t *pn_b, const polynomial_t **pn_min, const polynomial_t **pn_max) {
 	if (pn_b->degree > pn_a->degree) {
 		*pn_min = pn_a;
 		*pn_max = pn_b;
@@ -465,21 +463,19 @@ void pn_min_max(const polynomial_t *pn_a, const polynomial_t *pn_b, const polyno
 	}
 }
 
-unsigned long pff_opposite(unsigned long value) {
+static unsigned long pff_opposite(unsigned long value) {
 	return prime_g-value;
 }
 
-unsigned long pff_inverse(unsigned long value) {
-unsigned long i;
-	for (i = 1; i < prime_g && (value*i)%prime_g != 1; i++);
+static unsigned long pff_inverse(unsigned long value) {
+	unsigned long i;
+	for (i = 1; i < prime_g && (value*i)%prime_g != 1; ++i);
 	return i;
 }
 
-unsigned long ff_value(const unsigned long *values, unsigned long degree) {
-unsigned long result, factor, i;
-	result = 0;
-	factor = 1;
-	for (i = 0; i < degree; i++) {
+static unsigned long ff_value(const unsigned long *values, unsigned long degree) {
+	unsigned long result = 0, factor = 1, i;
+	for (i = 0; i < degree; ++i) {
 		result += values[i]*factor;
 		factor *= prime_g;
 	}
@@ -487,26 +483,25 @@ unsigned long result, factor, i;
 	return result;
 }
 
-void cleanup(void) {
-unsigned long i;
+static void cleanup(void) {
 	if (add_cache_g) {
-		FREE(add_cache_g);
+		free(add_cache_g);
 	}
 	if (mul_cache_g) {
-		FREE(mul_cache_g);
+		free(mul_cache_g);
 	}
 	if (pn_ff_g) {
-		for (i = 0; i < order_g; i++) {
+		unsigned long i;
+		for (i = 0; i < order_g; ++i) {
 			pn_destruction(pn_ff_g[i]);
 		}
-		FREE(pn_ff_g);
+		free(pn_ff_g);
 	}
 	pn_destruction(pn_irreducible_g);
 }
 
-polynomial_t *pn_creation(unsigned long degree) {
-polynomial_t *pn_result = NULL;
-	pn_result = malloc(sizeof(polynomial_t));
+static polynomial_t *pn_creation(unsigned long degree) {
+	polynomial_t *pn_result = malloc(sizeof(polynomial_t));
 	if (!pn_result) {
 		log_message("pn_creation error: pn_result = malloc(%lu)\n", sizeof(polynomial_t));
 		return NULL;
@@ -515,53 +510,56 @@ polynomial_t *pn_result = NULL;
 	pn_result->values = malloc(sizeof(unsigned long)*(degree+1));
 	if (!pn_result->values) {
 		log_message("pn_creation error: pn_result->values = malloc(%lu)\n", sizeof(unsigned long)*(degree+1));
-		FREE(pn_result);
+		free(pn_result);
 		return NULL;
 	}
 	return pn_result;
 }
 
-polynomial_t *pn_copy(const polynomial_t *pn) {
-unsigned long i;
-polynomial_t *pn_result = pn_creation(pn->degree);
+static polynomial_t *pn_copy(const polynomial_t *pn) {
+	unsigned long i;
+	polynomial_t *pn_result = pn_creation(pn->degree);
 	if (!pn_result) {
 		log_message("pn_copy error: pn_result = pn_creation(%lu)\n", pn->degree);
 		return NULL;
 	}
-	for (i = 0; i <= pn_result->degree; i++) pn_result->values[i] = pn->values[i];
+	for (i = 0; i <= pn_result->degree; ++i) {
+		pn_result->values[i] = pn->values[i];
+	}
 	return pn_result;
 }
 
-int pn_reduction(polynomial_t *pn) {
-unsigned long i, *tmp = NULL;
-	for (i = 0; i <= pn->degree; i++) {
+static int pn_reduction(polynomial_t *pn) {
+	unsigned long i;
+	for (i = 0; i <= pn->degree; ++i) {
 		pn->values[i] %= prime_g;
 	}
-	for (i = pn->degree; i > 0 && !pn->values[i]; i--);
+	for (i = pn->degree; i > 0 && !pn->values[i]; --i);
 	if (i < pn->degree) {
+		unsigned long *tmp;
 		pn->degree = i;
 		tmp = realloc(pn->values, sizeof(unsigned long)*(i+1));
 		if (!tmp) {
 			log_message("pn_reduction error: tmp = realloc(pn->values, %lu)\n", sizeof(unsigned long)*(i+1));
 			pn_destruction(pn);
-			return EXIT_FAILURE;
+			return 0;
 		}
 		pn->values = tmp;
 	}
-	return EXIT_SUCCESS;
+	return 1;
 }
 
-void pn_destruction(polynomial_t *pn) {
+static void pn_destruction(polynomial_t *pn) {
 	if (pn) {
 		if (pn->values) {
-			FREE(pn->values);
+			free(pn->values);
 		}
-		FREE(pn);
+		free(pn);
 	}
 }
 
-void log_message(const char *format, ...) {
-va_list arguments;
+static void log_message(const char *format, ...) {
+	va_list arguments;
 	va_start(arguments, format);
 	vfprintf(stderr, format, arguments);
 	va_end(arguments);
