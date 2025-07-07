@@ -9,7 +9,7 @@ This set of cards has below properties that are those of a projective plane of o
 
 I would have never been able to write that program without the help of below article (thank you Maxime):
 
-[https://images-des-maths.pages.math.cnrs.fr/freeze/Dobble-et-la-geometrie-finie.html]
+https://images-des-maths.pages.math.cnrs.fr/freeze/Dobble-et-la-geometrie-finie.html
 
 The program takes as input two numbers: a prime (p) and a power (q), n = p^q.
 
