@@ -37,6 +37,7 @@ static void cleanup(void);
 static void pn_destruction(polynomial_t *);
 
 int main(void) {
+	int result;
 	unsigned power, i;
 	if (scanf("%u", &prime_g) != 1 || prime_g < PRIME_MIN) {
 		log_message("Prime is not greater than or equal to %u\n", PRIME_MIN);
@@ -51,7 +52,7 @@ int main(void) {
 		return EXIT_FAILURE;
 	}
 	order_g = prime_g;
-	for (i = 1; i < power && order_g <= UINT_MAX/prime_g; ++i) {
+	for (i = POWER_MIN; i < power && order_g <= UINT_MAX/prime_g; ++i) {
 		order_g *= prime_g;
 	}
 	if (order_g > UINT_MAX/prime_g) {
@@ -74,21 +75,13 @@ int main(void) {
 		cleanup();
 		return EXIT_FAILURE;
 	}
-	if (power > 1) {
-		int result = search_irreducible_pn(0);
-		if (result < 1) {
-			if (!result) {
-				log_message("Irreducible polynomial not found\n");
-			}
-			cleanup();
-			return EXIT_FAILURE;
+	result = search_irreducible_pn(0);
+	if (result < 1) {
+		if (!result) {
+			log_message("Irreducible polynomial not found\n");
 		}
-	}
-	else {
-		for (i = 0; i < power; ++i) {
-			pn_irreducible_g->values[i] = 0;
-		}
-		pn_irreducible_g->values[power] = 1;
+		cleanup();
+		return EXIT_FAILURE;
 	}
 	if (sizeof(polynomial_t *) > UINT_MAX/order_g) {
 		log_message("Will not be able to allocate memory for pn_ff_g\n");
@@ -195,7 +188,7 @@ static int search_irreducible_pn(unsigned degree) {
 	if (degree < pn_irreducible_g->degree) {
 		unsigned i;
 		result = 0;
-		for (i = degree == 0; i < prime_g && !result; ++i) {
+		for (i = 0; i < prime_g && !result; ++i) {
 			pn_irreducible_g->values[degree] = i;
 			result = search_irreducible_pn(degree+1);
 			if (result < 0) {
@@ -464,12 +457,11 @@ static unsigned pff_opposite(unsigned value) {
 }
 
 static unsigned ff_value(const unsigned *values, unsigned degree) {
-	unsigned result = 0, factor = 1, i;
-	for (i = 0; i < degree; ++i) {
-		result += values[i]*factor;
+	unsigned factor = 1, result = values[0], i;
+	for (i = 1; i <= degree; ++i) {
 		factor *= prime_g;
+		result += values[i]*factor;
 	}
-	result += values[i]*factor;
 	return result;
 }
 
