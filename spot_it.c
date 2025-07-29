@@ -26,7 +26,6 @@ static polynomial_t *pn_multiplication(const polynomial_t *, const polynomial_t 
 static polynomial_t *pn_addition(const polynomial_t *, const polynomial_t *);
 static int pn_is_zero(const polynomial_t *);
 static void pn_min_max(const polynomial_t *, const polynomial_t *, const polynomial_t **, const polynomial_t **);
-static unsigned pff_opposite(unsigned);
 static unsigned ff_value(const unsigned *, unsigned);
 static polynomial_t *pn_copy(const polynomial_t *);
 static polynomial_t *pn_creation(unsigned);
@@ -202,7 +201,7 @@ static int search_irreducible_pn(unsigned degree) {
 			return -1;
 		}
 		pn_result->values[0] = 0;
-		pn_result->values[1] = pff_opposite(1);
+		pn_result->values[1] = prime_g-1;
 		for (j = 2; j < pn_result->degree; ++j) {
 			pn_result->values[j] = 0;
 		}
@@ -326,9 +325,7 @@ static polynomial_t *pn_modulus(const polynomial_t *pn_a, const polynomial_t *pn
 	}
 	while (!pn_is_zero(pn_result) && pn_result->degree >= pn_b->degree) {
 		unsigned i;
-		polynomial_t *pn_high, *pn_tmp;
-		const polynomial_t *pn_min, *pn_max;
-		pn_high = pn_creation(pn_result->degree-pn_b->degree);
+		polynomial_t *pn_high = pn_creation(pn_result->degree-pn_b->degree), *pn_tmp;
 		if (!pn_high) {
 			log_error("pn_modulus error: pn_high = pn_creation(%u)\n", pn_result->degree-pn_b->degree);
 			pn_destruction(pn_result);
@@ -346,25 +343,17 @@ static polynomial_t *pn_modulus(const polynomial_t *pn_a, const polynomial_t *pn
 			pn_destruction(pn_result);
 			return NULL;
 		}
+		for (i = 0; i <= pn_high->degree; ++i) {
+			pn_high->values[i] = prime_g-pn_high->values[i];
+		}
 		pn_tmp = pn_result;
-		pn_min_max(pn_tmp, pn_high, &pn_min, &pn_max);
-		pn_result = pn_creation(pn_max->degree);
-		if (!pn_result) {
-			log_error("pn_modulus error: pn_result = pn_creation(%u)\n", pn_max->degree);
-			return NULL;
-		}
-		for (i = 0; i <= pn_min->degree; ++i) {
-			pn_result->values[i] = pn_tmp->values[i]+pff_opposite(pn_high->values[i]);
-		}
-		for (i = pn_min->degree+1; i <= pn_tmp->degree; ++i) {
-			pn_result->values[i] = pn_tmp->values[i];
-		}
-		for (i = pn_min->degree+1; i <= pn_high->degree; ++i) {
-			pn_result->values[i] = pff_opposite(pn_high->values[i]);
-		}
-		pn_reduction(pn_result);
+		pn_result = pn_addition(pn_high, pn_tmp);
 		pn_destruction(pn_tmp);
 		pn_destruction(pn_high);
+		if (!pn_result) {
+			log_error("pn_modulus error: pn_result = pn_addition(pn_high, pn_tmp)\n");
+			return NULL;
+		}
 	}
 	return pn_result;
 }
@@ -426,10 +415,6 @@ static void pn_min_max(const polynomial_t *pn_a, const polynomial_t *pn_b, const
 		*pn_min = pn_b;
 		*pn_max = pn_a;
 	}
-}
-
-static unsigned pff_opposite(unsigned value) {
-	return prime_g-value;
 }
 
 static unsigned ff_value(const unsigned *values, unsigned degree) {
