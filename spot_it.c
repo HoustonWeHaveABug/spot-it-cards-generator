@@ -366,13 +366,9 @@ static polynomial_t *pn_multiplication(const polynomial_t *pn_a, const polynomia
 		pn_result->values[i] = 0;
 	}
 	for (i = 0; i <= pn_a->degree; ++i) {
-		if (pn_a->values[i]) {
-			unsigned j;
-			for (j = 0; j <= pn_b->degree; ++j) {
-				if (pn_b->values[j]) {
-					pn_result->values[i+j] += pn_a->values[i]*pn_b->values[j];
-				}
-			}
+		unsigned j;
+		for (j = 0; j <= pn_b->degree; ++j) {
+			pn_result->values[i+j] += pn_a->values[i]*pn_b->values[j];
 		}
 	}
 	pn_reduction(pn_result);
