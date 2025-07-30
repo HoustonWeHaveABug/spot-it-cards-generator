@@ -193,20 +193,19 @@ static int search_irreducible_pn(unsigned degree) {
 	power = 1;
 	for (i = 0; i < power_half_g; ++i) {
 		unsigned j;
-		polynomial_t *pn_result, *pn_tmp;
+		polynomial_t *pn_tmp, *pn_result;
 		power *= prime_g;
-		pn_result = pn_creation(power);
-		if (!pn_result) {
-			log_error("search_irreducible_pn error: pn_result = pn_creation(%u)\n", power);
+		pn_tmp = pn_creation(power);
+		if (!pn_tmp) {
+			log_error("search_irreducible_pn error: pn_tmp = pn_creation(%u)\n", power);
 			return -1;
 		}
-		pn_result->values[0] = 0;
-		pn_result->values[1] = prime_g-1;
-		for (j = 2; j < pn_result->degree; ++j) {
-			pn_result->values[j] = 0;
+		pn_tmp->values[0] = 0;
+		pn_tmp->values[1] = prime_g-1;
+		for (j = 2; j < pn_tmp->degree; ++j) {
+			pn_tmp->values[j] = 0;
 		}
-		pn_result->values[pn_result->degree] = 1;
-		pn_tmp = pn_result;
+		pn_tmp->values[pn_tmp->degree] = 1;
 		pn_result = pn_modulus(pn_tmp, pn_irreducible_g);
 		pn_destruction(pn_tmp);
 		if (!pn_result) {
@@ -289,16 +288,15 @@ static unsigned *cache_creation(void) {
 
 static unsigned operation(unsigned i, unsigned j, unsigned *cache, polynomial_t *(*pn_operation)(const polynomial_t *, const polynomial_t *)) {
 	unsigned icache = i*order_g+j, result;
-	polynomial_t *pn_result, *pn_tmp;
+	polynomial_t *pn_tmp, *pn_result;
 	if (cache[icache] < order_g) {
 		return cache[icache];
 	}
-	pn_result = pn_operation(pn_ff_g[i], pn_ff_g[j]);
-	if (!pn_result) {
-		log_error("operation error: pn_result = pn_operation(%u, %u)\n", pn_ff_g[i], pn_ff_g[j]);
+	pn_tmp = pn_operation(pn_ff_g[i], pn_ff_g[j]);
+	if (!pn_tmp) {
+		log_error("operation error: pn_tmp = pn_operation(%u, %u)\n", pn_ff_g[i], pn_ff_g[j]);
 		return order_g;
 	}
-	pn_tmp = pn_result;
 	pn_result = pn_modulus(pn_tmp, pn_irreducible_g);
 	pn_destruction(pn_tmp);
 	if (!pn_result) {
@@ -325,17 +323,16 @@ static polynomial_t *pn_modulus(const polynomial_t *pn_a, const polynomial_t *pn
 	}
 	while (!pn_is_zero(pn_result) && pn_result->degree >= pn_b->degree) {
 		unsigned i;
-		polynomial_t *pn_high = pn_creation(pn_result->degree-pn_b->degree), *pn_tmp;
-		if (!pn_high) {
-			log_error("pn_modulus error: pn_high = pn_creation(%u)\n", pn_result->degree-pn_b->degree);
+		polynomial_t *pn_tmp = pn_creation(pn_result->degree-pn_b->degree), *pn_high;
+		if (!pn_tmp) {
+			log_error("pn_modulus error: pn_tmp = pn_creation(%u)\n", pn_result->degree-pn_b->degree);
 			pn_destruction(pn_result);
 			return NULL;
 		}
-		for (i = 0; i < pn_high->degree; ++i) {
-			pn_high->values[i] = 0;
+		for (i = 0; i < pn_tmp->degree; ++i) {
+			pn_tmp->values[i] = 0;
 		}
-		pn_high->values[pn_high->degree] = (pn_result->values[pn_result->degree]*inverses_g[pn_b->values[pn_b->degree]])%prime_g;
-		pn_tmp = pn_high;
+		pn_tmp->values[pn_tmp->degree] = (pn_result->values[pn_result->degree]*inverses_g[pn_b->values[pn_b->degree]])%prime_g;
 		pn_high = pn_multiplication(pn_b, pn_tmp);
 		pn_destruction(pn_tmp);
 		if (!pn_high) {
