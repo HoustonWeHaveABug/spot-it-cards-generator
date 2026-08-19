@@ -7,9 +7,7 @@ This set of cards has below properties that are those of a projective plane of o
 - Every two cards have exactly one symbol in common
 - For every two symbols there is exactly one card that has both of them
 
-I would have never been able to write that program without the help of below article (thank you Maxime):
-
-https://images-des-maths.pages.math.cnrs.fr/freeze/Dobble-et-la-geometrie-finie.html
+I would have never been able to write that program without the help of [this article](https://images.math.cnrs.fr/freeze/Dobble-et-la-geometrie-finie.html) (thank you Maxime):
 
 The program takes as input two numbers: a prime (p) and a power (q), n = p^q.
 
